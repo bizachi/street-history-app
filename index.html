@@ -87,7 +87,7 @@
 
     <script>
         
-        // --- 1. DEFINIÇÃO DAS CAMADAS DO MAPA ---
+        // DEFINIÇÃO DAS CAMADAS DO MAPA ---
         const lightTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '© OpenStreetMap'
         });
@@ -96,14 +96,14 @@
             attribution: '© CartoDB'
         });
 
-        // 1. Inicializa o mapa com uma visão global (por precaução)
+        // Inicializa o mapa com uma visão global (por precaução)
 const map = L.map('map', {
     center: [0, 0],
     zoom: 2,
     layers: [lightTiles] 
 });
 
-// 2. FUNÇÃO DE INICIALIZAÇÃO AUTOMÁTICA
+// FUNÇÃO DE INICIALIZAÇÃO AUTOMÁTICA
 function inicializarComGPS() {
     if (!navigator.geolocation) {
         console.log("GPS não suportado pelo navegador.");
@@ -129,23 +129,23 @@ function inicializarComGPS() {
             marcadorUsuario = L.circleMarker(latlng, { 
                 radius: 8, fillColor: "#3388ff", color: "#fff", weight: 3, fillOpacity: 0.8 
             }).addTo(map);
-
+			
             // Dispara a pesquisa automática da rua onde o utilizador está
             processarLocalizacao(latlng);
         },
         (error) => {
             console.warn("Erro ao obter GPS inicial:", error.message);
-            // Se falhar (ex: utilizador negou), podemos focar numa cidade padrão
+            // Se falhar (ex: utilizador negou)
             map.setView([39.5, -8.0], 6); // Ex: Portugal
         },
         gpsOptions
     );
 }
 
-// 3. Executa a função assim que a página carrega
+// Executa a função assim que a página carrega
 window.onload = inicializarComGPS;
 
-        // --- 2. LÓGICA DE TROCA DE TEMA ---
+        // LÓGICA DE TROCA DE TEMA ---
         let isDarkMode = false;
 
         function toggleDarkMode() {
@@ -163,9 +163,7 @@ window.onload = inicializarComGPS;
             }
         }
 
-        // --- 3. LÓGICA DE DADOS (MANTIDA DAS VERSÕES ANTERIORES) ---
-        // (As funções limparNomeParaWiki, processarLocalizacao, etc., continuam aqui)
-        
+        // LÓGICA DE DADOS (MANTIDA DAS VERSÕES ANTERIORES) ---
         const countryToLang = { 'br':'pt', 'pt':'pt', 'us':'en', 'gb':'en', 'es':'es', 'fr':'fr' };
         let currentWikiLang = 'pt';
         let isAutoLang = true;
