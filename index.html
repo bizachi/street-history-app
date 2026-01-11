@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Street History - Dark Mode</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+    
+    <style>
+        /* 1. VARIÁVEIS DE CORES (Tema Claro por padrão) */
+        :root {
+            --bg-ui: #ffffff;
+            --text-main: #2c3e50;
+            --text-sec: #666666;
+            --border: rgba(0,0,0,0.2);
+            --hover-bg: #f4f4f4;
+            --wiki-card: #f9f9f9;
+        }
+
+        /* 2. CORES DO MODO ESCURO */
+        body.dark-theme {
+            --bg-ui: #1e1e1e;
+            --text-main: #e0e0e0;
+            --text-sec: #aaaaaa;
+            --border: #444444;
+            --hover-bg: #333333;
+            --wiki-card: #2d2d2d;
+        }
+
+        body { margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background: var(--bg-ui); }
+        #map { height: 100vh; width: 100%; z-index: 1; }
+
+        /* Interface Customizada */
+        .custom-controls-container {
+            position: absolute; top: 10px; right: 10px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 8px; align-items: flex-end;
+        }
+
+        .control-item {
+            background: var(--bg-ui);
+            color: var(--text-main);
+            padding: 8px 12px;
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+            min-width: 140px;
+        }
+        .control-item:hover { background: var(--hover-bg); }
+
+        /* Popups Estilizados */
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+            background: var(--bg-ui) !important;
+            color: var(--text-main) !important;
+        }
+
+        .info-box { width: 280px; font-size: 14px; line-height: 1.5; max-height: 350px; overflow-y: auto; }
+        .info-title { font-weight: bold; font-size: 16px; border-bottom: 1px solid var(--border); margin-bottom: 8px; }
+        .wiki-img { max-width: 100%; border-radius: 4px; margin-top: 8px; display: block; }
+        
+        .search-result { background: var(--wiki-card); border: 1px solid var(--border); padding: 8px; margin-bottom: 5px; cursor: pointer; border-radius: 4px; }
+        .search-result:hover { border-color: #3388ff; }
+        .search-title { font-weight: bold; color: #3388ff; display: block; }
+        .search-snippet { font-size: 11px; color: var(--text-sec); }
+    </style>
+</head>
+<body class="light-theme"> <div class="custom-controls-container">
+        <button class="control-item" onclick="toggleDarkMode()">🌓 Alternar Tema</button>
+        
+        <select id="langSelector" class="control-item" onchange="alterarIdiomaManual()">
+            <option value="auto">🌐 Automático</option>
+            <option value="pt">Português</option>
+            <option value="en">English</option>
+            <option value="es">Español</option>
+            <option value="fr">Français</option>
+        </select>
+        <button class="control-item" onclick="irParaMinhaLocalizacao()">📍 GPS</button>
+    </div>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+    <script>
+        // --- 1. DEFINIÇÃO DAS CAMADAS DO MAPA ---
+        const lightTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        });
+
+        const darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '© CartoDB'
+        });
+
+        const map = L.map('map', {
+            center: [39.5, -8.0],
+            zoom: 6,
+            layers: [lightTiles] // Começa com a clara
+        });
+
+        // --- 2. LÓGICA DE TROCA DE TEMA ---
+        let isDarkMode = false;
+
+        function toggleDarkMode() {
+            isDarkMode = !isDarkMode;
+            const body = document.body;
+
+            if (isDarkMode) {
+                body.classList.add('dark-theme');
+                map.removeLayer(lightTiles);
+                darkTiles.addTo(map);
+            } else {
+                body.classList.remove('dark-theme');
+                map.removeLayer(darkTiles);
+                lightTiles.addTo(map);
+            }
+        }
+
+        // --- 3. LÓGICA DE DADOS (MANTIDA DAS VERSÕES ANTERIORES) ---
+        // (As funções limparNomeParaWiki, processarLocalizacao, etc., continuam aqui)
+        
+        const countryToLang = { 'br':'pt', 'pt':'pt', 'us':'en', 'gb':'en', 'es':'es', 'fr':'fr' };
+        let currentWikiLang = 'pt';
+        let isAutoLang = true;
+
+        function alterarIdiomaManual() {
+            const val = document.getElementById('langSelector').value;
+            isAutoLang = (val === 'auto');
+            if(!isAutoLang) currentWikiLang = val;
+        }
+
+        function limparNomeParaWiki(nomeCompleto) {
+            if (!nomeCompleto) return "";
+            const prefixos = /^(Rua|Avenida|Av\.|Travessa|Praça|Calle|Plaza|Via|Corso|Rue|Boulevard|Strasse|Dr\.|Prof\.)\s+/i;
+            const sufixos = /\s+(Street|St|Road|Rd|Avenue|Ave|Lane|Ln|Strasse|Weg)$/i;
+            return nomeCompleto.replace(prefixos, "").replace(sufixos, "").trim();
+        }
+
+        async function processarLocalizacao(latlng) {
+            const popup = L.popup().setLatLng(latlng).setContent('A buscar local...').openOn(map);
+            try {
+                const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`);
+                const d = await r.json();
+                const nomeRua = d.address.road || d.address.pedestrian || d.address.suburb || d.address.city;
+                if (isAutoLang) currentWikiLang = countryToLang[d.address.country_code] || 'en';
+                if (!nomeRua) { popup.setContent("Local não identificado."); return; }
+                abrirSeletorWiki(nomeRua, latlng);
+            } catch (e) { popup.setContent("Erro de conexão."); }
+        }
+
+        async function abrirSeletorWiki(nomeRua, latlng) {
+            const id = 'wiki-' + Math.random().toString(36).substr(2, 5);
+            const popup = L.popup().setLatLng(latlng).setContent(`<div id="${id}" class="info-box">Pesquisando...</div>`).openOn(map);
+            const termo = limparNomeParaWiki(nomeRua);
+            const url = `https://${currentWikiLang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(termo)}&format=json&origin=*&srlimit=4`;
+
+            try {
+                const res = await fetch(url);
+                const data = await res.json();
+                const resultados = data.query.search;
+                const container = document.getElementById(id);
+
+                if (resultados.length > 0) {
+                    let html = `<span class="info-title">${nomeRua}</span>`;
+                    resultados.forEach(item => {
+                        html += `<div class="search-result" data-title="${item.title.replace(/'/g, "\\'")}"><span class="search-title">${item.title}</span><span class="search-snippet">${item.snippet.replace(/<[^>]*>?/gm, '')}...</span></div>`;
+                    });
+                    container.innerHTML = html;
+                    container.querySelectorAll('.search-result').forEach(el => {
+                        el.addEventListener('click', (e) => {
+                            L.DomEvent.stopPropagation(e);
+                            carregarDetalheFinal(el.getAttribute('data-title'), id);
+                        });
+                    });
+                } else { container.innerHTML = "Sem resultados históricos."; }
+            } catch (e) { container.innerHTML = "Erro Wikipédia."; }
+        }
+
+        async function carregarDetalheFinal(titulo, id) {
+            const container = document.getElementById(id);
+            container.innerHTML = 'Carregando...';
+            const url = `https://${currentWikiLang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(titulo)}`;
+            try {
+                const r = await fetch(url);
+                const data = await r.json();
+                let html = `<span class="info-title">${data.title}</span><p>${data.extract}</p>`;
+                if (data.thumbnail) html += `<img src="${data.thumbnail.source}" class="wiki-img" />`;
+                html += `<br><a href="${data.content_urls.desktop.page}" target="_blank" style="color:#3388ff">Ler mais</a>`;
+                container.innerHTML = html;
+            } catch (e) { container.innerHTML = "Erro nos detalhes."; }
+        }
+
+        map.on('click', (e) => processarLocalizacao(e.latlng));
+        
+        L.Control.geocoder({ defaultMarkGeocode: false, position: 'topleft' })
+            .on('markgeocode', e => { map.setView(e.geocode.center, 18); processarLocalizacao(e.geocode.center); })
+            .addTo(map);
+
+        function irParaMinhaLocalizacao() {
+            navigator.geolocation.getCurrentPosition(p => {
+                const ll = L.latLng(p.coords.latitude, p.coords.longitude);
+                map.setView(ll, 18);
+                processarLocalizacao(ll);
+            });
+        }
+    </script>
+</body>
+</html>
